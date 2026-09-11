@@ -1,3 +1,5 @@
+import re
+
 import store
 import gemini
 
@@ -28,7 +30,7 @@ AUTO_COUNT = {}
 
 def has_any(text, words):
     lower = (text or "").strip().lower()
-    return any(w in lower for w in words)
+    return any(re.search(r"\b" + re.escape(w) + r"\b", lower) for w in words)
 
 
 def build_prompt(data, conversation_id, incoming_message, from_role):
