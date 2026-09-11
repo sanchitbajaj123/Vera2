@@ -3,7 +3,12 @@ import os
 
 import redis
 
-REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379")
+REDIS_URL = (
+    os.environ.get("REDIS_URL")
+    or os.environ.get("KV_URL")
+    or os.environ.get("UPSTASH_REDIS_URL")
+    or "redis://localhost:6379"
+)
 r = redis.from_url(REDIS_URL, decode_responses=True)
 
 SCOPES = ["category", "merchant", "customer", "trigger"]
