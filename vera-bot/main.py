@@ -1,5 +1,5 @@
 import time
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, TimeoutError, as_completed
 from datetime import datetime, timezone
 
 from fastapi import FastAPI
@@ -12,7 +12,8 @@ from schemas import ContextBody, TickBody, ReplyBody
 app = FastAPI(title="Vera 2.0")
 STARTED_AT = time.time()
 
-MAX_PER_TICK = 3
+MAX_PER_TICK = 2
+TICK_BUDGET_SECONDS = 8
 
 
 def now():
@@ -67,22 +68,30 @@ def choose(trigger_ids, tick_number):
 
 @app.post("/v1/tick")
 def tick(body: TickBody):
+    started = time.time()
     tick_number = store.next_tick_number()
 
     chosen = choose(body.available_triggers, tick_number)
     if not chosen:
         return {"actions": []}
 
-    with ThreadPoolExecutor(max_workers=MAX_PER_TICK) as pool:
-        results = list(pool.map(trigger.make_message, chosen))
-
     actions = []
-    for action in results:
-        if not action:
-            continue
-        actions.append(action)
-        store.mark_sent(action["suppression_key"])
-        store.set_last_tick(action["merchant_id"], tick_number)
+    pool = ThreadPoolExecutor(max_workers=MAX_PER_TICK)
+    futures = [pool.submit(trigger.make_message, tid) for tid in chosen]
+
+    try:
+        left = TICK_BUDGET_SECONDS - (time.time() - started)
+        for future in as_completed(futures, timeout=max(0.5, left)):
+            action = future.result()
+            if not action:
+                continue
+            actions.append(action)
+            store.mark_sent(action["suppression_key"])
+            store.set_last_tick(action["merchant_id"], tick_number)
+    except TimeoutError:
+        pass
+    finally:
+        pool.shutdown(wait=False)
 
     return {"actions": actions}
 

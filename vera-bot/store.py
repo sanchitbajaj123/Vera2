@@ -195,7 +195,7 @@ def is_quota_over(model):
 
 def mark_quota_over(model):
     r.sadd(KEY_QUOTA_OVER, model)
-    r.expire(KEY_QUOTA_OVER, 3600)
+    r.expire(KEY_QUOTA_OVER, 21600)
 
 
 def clear():
