@@ -54,6 +54,31 @@ def get(scope, context_id):
     return json.loads(raw)["payload"] if raw else None
 
 
+def get_many(scope, context_ids):
+    if not context_ids or scope not in SCOPES:
+        return {}
+    rows = r.hmget(KEY_CONTEXT.format(scope=scope), context_ids)
+    return {
+        cid: json.loads(raw)["payload"]
+        for cid, raw in zip(context_ids, rows) if raw
+    }
+
+
+def were_sent(suppression_keys):
+    keys = [k for k in suppression_keys if k]
+    if not keys:
+        return set()
+    flags = r.smismember(KEY_SENT, keys)
+    return {k for k, on in zip(keys, flags) if on}
+
+
+def last_ticks(merchant_ids):
+    if not merchant_ids:
+        return {}
+    values = r.hmget(KEY_LAST_TICK, merchant_ids)
+    return {mid: int(v) if v else -99 for mid, v in zip(merchant_ids, values)}
+
+
 def count():
     return {scope: r.hlen(KEY_CONTEXT.format(scope=scope)) for scope in SCOPES}
 
@@ -150,11 +175,6 @@ def was_sent(suppression_key):
 
 def mark_sent(suppression_key):
     r.sadd(KEY_SENT, suppression_key)
-
-
-def last_tick(merchant_id):
-    value = r.hget(KEY_LAST_TICK, merchant_id)
-    return int(value) if value else -99
 
 
 def set_last_tick(merchant_id, tick_number):

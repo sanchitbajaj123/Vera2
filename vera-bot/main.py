@@ -32,27 +32,28 @@ def push_context(body: ContextBody):
 
 
 def choose(trigger_ids, tick_number):
-    options = []
-    for tid in trigger_ids:
-        data = store.collect(tid)
-        if data:
-            options.append((tid, data))
+    triggers = store.get_many("trigger", trigger_ids)
+    if not triggers:
+        return []
 
-    options.sort(key=lambda x: x[1]["trigger"].get("urgency", 2), reverse=True)
+    options = sorted(triggers.items(), key=lambda kv: kv[1].get("urgency", 2), reverse=True)
+
+    already_sent = store.were_sent([t.get("suppression_key") for _, t in options])
+    ticks = store.last_ticks([t.get("merchant_id") for _, t in options if t.get("merchant_id")])
 
     chosen = []
     done = set()
 
-    for tid, data in options:
-        merchant_id = data["merchant"]["merchant_id"]
+    for tid, trg in options:
+        merchant_id = trg.get("merchant_id")
 
-        if store.was_sent(data["trigger"].get("suppression_key")):
+        if not merchant_id or merchant_id in done:
             continue
-        if merchant_id in done:
+        if trg.get("suppression_key") in already_sent:
             continue
-        if tick_number - store.last_tick(merchant_id) < 3:
+        if tick_number - ticks.get(merchant_id, -99) < 3:
             continue
-        if data["trigger"].get("urgency", 2) <= 1:
+        if trg.get("urgency", 2) <= 1:
             continue
 
         chosen.append(tid)
