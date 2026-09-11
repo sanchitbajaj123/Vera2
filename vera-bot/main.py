@@ -120,11 +120,11 @@ def healthz():
 @app.get("/v1/metadata")
 def metadata():
     return {
-        "team_name": "TODO — apna naam daalo",
-        "team_members": ["TODO"],
-        "model": "gemini-3.6-flash",
+        "team_name": "Sanchit Bajaj",
+        "team_members": ["Sanchit Bajaj"],
+        "model": "gemini-3.6-flash (falls back to gemini-3.5-flash-lite on quota)",
         "approach": "Context join by trigger id, fact-grounded prompt, rule-based reply routing",
-        "contact_email": "TODO@example.com",
+        "contact_email": "sanchitbajaj2003@gmail.com",
         "version": "1.0.0",
         "submitted_at": now(),
     }

@@ -1,3 +1,5 @@
+import re
+
 import store
 import gemini
 
@@ -97,6 +99,11 @@ Words that are fine to use: {voice.get('vocab_allowed', [])[:10]}
 - Only mention an offer when the event itself is about offers, bookings, or weak
   performance. When you do, name it as "service @ price" (like "Dental Cleaning @ Rs 299"),
   never a vague discount like "10% off" or "special offer".
+- Write dates and time gaps the way a person actually speaks them — "since 1 April",
+  "5 months ago", "last Tuesday". Never copy an ISO date like 2026-04-01 into the message,
+  and never use the same connecting word twice in one sentence.
+- Read your sentence back before you output it. If it would sound wrong spoken aloud,
+  rewrite it.
 - Keep it 2 to 5 short lines.
 - Exactly ONE ask, and it must be the LAST line — something they can answer in three words.
 
@@ -122,6 +129,9 @@ def check(text, data):
 
     if len(text) > 700:
         problems.append("too long")
+
+    if re.search(r"\bsince\b[^.?!]*\bsince\b", lower) or "it has been since" in lower:
+        problems.append("awkward repeated 'since' in one sentence")
 
     if text.rstrip()[-1] not in ".?!)।":
         problems.append("looks cut off in the middle")
