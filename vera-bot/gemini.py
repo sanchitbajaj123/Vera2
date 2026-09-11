@@ -1,5 +1,8 @@
 import os
+
 import requests
+
+import store
 
 API_KEY = os.environ.get("GEMINI_API_KEY", "")
 
@@ -12,15 +15,13 @@ MODELS = [
 
 BASE = "https://generativelanguage.googleapis.com/v1beta/models"
 
-_quota_over = set()
-
 
 def ask(prompt, timeout=20):
     if not API_KEY:
         return None
 
     for model in MODELS:
-        if model in _quota_over:
+        if store.is_quota_over(model):
             continue
         text = _call_one(model, prompt, timeout)
         if text:
@@ -44,7 +45,7 @@ def _call_one(model, prompt, timeout):
         return None
 
     if response.status_code == 429:
-        _quota_over.add(model)
+        store.mark_quota_over(model)
         return None
     if response.status_code != 200:
         return None

@@ -32,8 +32,9 @@ carrying a taboo word is dropped in favour of a deterministic template rather th
 
 ## Tradeoffs
 
-- **In-memory store, no Redis.** The brief permits it and the test never restarts the process.
-  A restart mid-test would lose everything — the honest cost of the simpler choice.
+- **Redis for all state.** In-memory would have been simpler and is permitted by the brief,
+  but it rules out serverless hosting, where consecutive requests land on different instances.
+  Redis costs roughly a second of tick latency and buys deployment freedom.
 - **Hardcoded commitment reply.** Less expressive than an LLM turn, but it can never drift back
   into qualifying, and it costs no latency.
 - **Four actions per tick.** Below the cap of 20. With ~5s per composition, more actions would
@@ -58,10 +59,12 @@ carrying a taboo word is dropped in favour of a deterministic template rather th
 vera-bot/
 ├── main.py           routes only — no logic
 ├── schemas.py        request body shapes
-├── store.py          five containers + the trigger→merchant→category join
+├── store.py          Redis-backed state + the trigger→merchant→category join
 ├── trigger.py        first message: prompt, validation, retry
 ├── reply.py          reply routing: rules first, LLM last
 ├── gemini.py         one LLM call, with a model fallback chain
+├── api/index.py      Vercel entry point
+├── vercel.json       Vercel config
 └── requirements.txt
 ```
 
@@ -69,14 +72,18 @@ vera-bot/
 |---|---|
 | `main.py` | The five endpoints, plus trigger selection and parallel composition at tick time |
 | `schemas.py` | Pydantic models for the three POST bodies |
-| `store.py` | `CATEGORIES/MERCHANTS/CUSTOMERS/TRIGGERS` keyed by context id, plus `CONVERSATIONS` keyed by conversation id; `collect()` joins all four layers from one trigger id |
+| `store.py` | Every piece of mutable state, in Redis: the four context hashes, the conversation hash, suppression keys, per-merchant tick and auto-reply counters, and the model-quota set. `collect()` joins all four layers from one trigger id |
 | `trigger.py` | The composition prompt, output validation, one retry, deterministic fallback |
 | `reply.py` | Refusal / auto-reply / repeat / commitment rules, then the conversation prompt |
 | `gemini.py` | Temperature 0; a 429 retires that model and moves to the next |
 
-Conversation history lives in `store.CONVERSATIONS`, not on the merchant. The merchant's
-`conversation_history` seeds a new conversation; every turn after that is appended to the
-conversation container, so both prompts read from one place.
+Conversation history lives in Redis under `vera:conv`, not on the merchant. The merchant's
+`conversation_history` seeds a new conversation; every turn after that is appended there, so
+both prompts read from one place.
+
+Nothing is held in process memory, so the bot survives a restart and runs correctly on
+serverless platforms where each request may hit a different instance. `POST /v1/teardown`
+deletes every `vera:*` key, which is also what makes back-to-back test runs clean.
 
 ## Running it
 
@@ -86,6 +93,7 @@ source venv/bin/activate
 pip install -r vera-bot/requirements.txt
 
 export GEMINI_API_KEY="your-key-from-aistudio.google.com/apikey"
+export REDIS_URL="redis://localhost:6379"     # or your Upstash URL
 
 cd vera-bot
 uvicorn main:app --host 0.0.0.0 --port 8080
@@ -105,3 +113,16 @@ python run_judge.py phase2_short  # scored composition
 decision quality 8, engagement 8. Tick latency 7.3s, inside the 10s budget.
 `all`: warmup, auto-reply, intent transition and hostile handling all pass. The auto-reply
 path runs send → wait(24h) → end, matching the replay-test expectation.
+
+## Deploying
+
+The app is serverless-ready: `vera-bot/api/index.py` exposes the FastAPI app and
+`vera-bot/vercel.json` routes every path to it.
+
+1. Create a Redis database (Upstash has a free tier) and copy its connection URL.
+2. Import this repository on Vercel with **Root Directory** set to `vera-bot`.
+3. Set two environment variables in the project: `GEMINI_API_KEY` and `REDIS_URL`.
+4. Deploy, then give the judge `https://<your-project>.vercel.app` — the endpoints live at `/v1/*`.
+
+Any host that runs a long-lived process (Render, Railway, Fly) works too, with the same two
+environment variables.

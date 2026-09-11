@@ -70,8 +70,8 @@ Services they took before: {rel.get('services_received')}
 Their status: {customer.get('state')}
 When they prefer to come: {customer.get('preferences', {}).get('preferred_slots')}
 They consented to: {customer.get('consent', {}).get('scope')}"""
-    elif data.get("all_customers"):
-        prompt += f"\n\nThis shop has {len(data['all_customers'])} customers on record."
+    elif data.get("customer_count"):
+        prompt += f"\n\nThis shop has {data['customer_count']} customers on record."
 
     prompt += f"""
 

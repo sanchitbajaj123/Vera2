@@ -25,7 +25,6 @@ NO_WORDS = [
     "band karo", "mat bhejo", "nahi chahiye", "block", "remove me", "bakwas",
 ]
 
-AUTO_COUNT = {}
 
 
 def has_any(text, words):
@@ -99,9 +98,7 @@ def handle(conversation_id, merchant_id, customer_id, message, from_role, turn_n
         }
 
     if has_any(message, AUTO_REPLY_WORDS):
-        key = merchant_id or conversation_id
-        AUTO_COUNT[key] = AUTO_COUNT.get(key, 0) + 1
-        times = AUTO_COUNT[key]
+        times = store.bump_auto_reply(merchant_id or conversation_id)
 
         if times == 1:
             body = ("Samajh gayi — ye automated reply lag raha hai. "
@@ -198,6 +195,3 @@ def llm_reply(conversation_id, merchant_id, customer_id, message, from_role):
         "rationale": "Normal reply — answered their message using stored context, one ask at the end.",
     }
 
-
-def clear():
-    AUTO_COUNT.clear()

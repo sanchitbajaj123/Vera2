@@ -12,9 +12,6 @@ from schemas import ContextBody, TickBody, ReplyBody
 app = FastAPI(title="Vera 2.0")
 STARTED_AT = time.time()
 
-SENT_KEYS = set()
-LAST_TICK = {}
-TICK_NUMBER = [0]
 MAX_PER_TICK = 3
 
 
@@ -49,11 +46,11 @@ def choose(trigger_ids, tick_number):
     for tid, data in options:
         merchant_id = data["merchant"]["merchant_id"]
 
-        if data["trigger"].get("suppression_key") in SENT_KEYS:
+        if store.was_sent(data["trigger"].get("suppression_key")):
             continue
         if merchant_id in done:
             continue
-        if tick_number - LAST_TICK.get(merchant_id, -99) < 3:
+        if tick_number - store.last_tick(merchant_id) < 3:
             continue
         if data["trigger"].get("urgency", 2) <= 1:
             continue
@@ -69,8 +66,7 @@ def choose(trigger_ids, tick_number):
 
 @app.post("/v1/tick")
 def tick(body: TickBody):
-    TICK_NUMBER[0] += 1
-    tick_number = TICK_NUMBER[0]
+    tick_number = store.next_tick_number()
 
     chosen = choose(body.available_triggers, tick_number)
     if not chosen:
@@ -84,8 +80,8 @@ def tick(body: TickBody):
         if not action:
             continue
         actions.append(action)
-        SENT_KEYS.add(action["suppression_key"])
-        LAST_TICK[action["merchant_id"]] = tick_number
+        store.mark_sent(action["suppression_key"])
+        store.set_last_tick(action["merchant_id"], tick_number)
 
     return {"actions": actions}
 
@@ -127,7 +123,4 @@ def metadata():
 @app.post("/v1/teardown")
 def teardown():
     store.clear()
-    reply.clear()
-    SENT_KEYS.clear()
-    LAST_TICK.clear()
     return {"ok": True}
