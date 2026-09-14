@@ -143,7 +143,7 @@ def metadata():
     return {
         "team_name": "Sanchit Bajaj",
         "team_members": ["Sanchit Bajaj"],
-        "model": "gemini-3.6-flash (falls back to gemini-3.5-flash-lite on quota)",
+        "model": "gemini-3.5-flash-lite (falls back to gemini-flash-lite-latest on quota)",
         "approach": "Context join by trigger id, fact-grounded prompt, rule-based reply routing",
         "contact_email": "sanchitbajaj2003@gmail.com",
         "version": "1.0.0",

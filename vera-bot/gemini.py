@@ -7,7 +7,7 @@ import store
 API_KEY = os.environ.get("GEMINI_API_KEY", "")
 
 MODELS = [
-    os.environ.get("GEMINI_MODEL", "gemini-3.5-flash-lite"),
+    "gemini-3.5-flash-lite",
     "gemini-flash-lite-latest",
     "gemini-3.1-flash-lite",
 ]
