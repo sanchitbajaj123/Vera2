@@ -13,7 +13,8 @@ app = FastAPI(title="Vera 2.0")
 STARTED_AT = time.time()
 
 MAX_PER_TICK = 2
-TICK_BUDGET_SECONDS = 8
+TICK_SOFT_BUDGET = 9
+TICK_HARD_BUDGET = 24
 
 
 def now():
@@ -78,20 +79,40 @@ def tick(body: TickBody):
     actions = []
     pool = ThreadPoolExecutor(max_workers=MAX_PER_TICK)
     futures = [pool.submit(trigger.make_message, tid) for tid in chosen]
+    collected = set()
 
-    try:
-        left = TICK_BUDGET_SECONDS - (time.time() - started)
-        for future in as_completed(futures, timeout=max(0.5, left)):
+    def take(future):
+        collected.add(future)
+        try:
             action = future.result()
-            if not action:
-                continue
-            actions.append(action)
-            store.mark_sent(action["suppression_key"])
-            store.set_last_tick(action["merchant_id"], tick_number)
-    except TimeoutError:
-        pass
-    finally:
-        pool.shutdown(wait=False)
+        except Exception:
+            return
+        if not action:
+            return
+        actions.append(action)
+        store.mark_sent(action["suppression_key"])
+        store.set_last_tick(action["merchant_id"], tick_number)
+
+    def wait_until(deadline):
+        pending = [f for f in futures if f not in collected]
+        if not pending:
+            return
+        try:
+            for future in as_completed(pending, timeout=max(0.5, deadline - (time.time() - started))):
+                take(future)
+        except TimeoutError:
+            pass
+
+    wait_until(TICK_SOFT_BUDGET)
+
+    if not actions:
+        wait_until(TICK_HARD_BUDGET)
+
+    for future in futures:
+        if future not in collected and future.done():
+            take(future)
+
+    pool.shutdown(wait=False)
 
     return {"actions": actions}
 

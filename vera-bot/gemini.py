@@ -7,11 +7,9 @@ import store
 API_KEY = os.environ.get("GEMINI_API_KEY", "")
 
 MODELS = [
-    os.environ.get("GEMINI_MODEL", "gemini-3.6-flash"),
-    "gemini-3.5-flash-lite",
+    os.environ.get("GEMINI_MODEL", "gemini-3.5-flash-lite"),
     "gemini-flash-lite-latest",
     "gemini-3.1-flash-lite",
-    "gemini-3.5-flash",
 ]
 
 BASE = "https://generativelanguage.googleapis.com/v1beta/models"
