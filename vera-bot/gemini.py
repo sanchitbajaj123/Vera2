@@ -15,7 +15,7 @@ MODELS = [
 BASE = "https://generativelanguage.googleapis.com/v1beta/models"
 
 
-def ask(prompt, timeout=8):
+def ask(prompt, timeout=6):
     if not API_KEY:
         return None
 

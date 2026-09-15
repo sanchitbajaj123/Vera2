@@ -12,7 +12,7 @@ from schemas import ContextBody, TickBody, ReplyBody
 app = FastAPI(title="Vera 2.0")
 STARTED_AT = time.time()
 
-MAX_PER_TICK = 2
+MAX_PER_TICK = 3
 TICK_SOFT_BUDGET = 9
 TICK_HARD_BUDGET = 24
 
@@ -48,18 +48,19 @@ def choose(trigger_ids, tick_number):
 
     for tid, trg in options:
         merchant_id = trg.get("merchant_id")
+        if not merchant_id:
+            continue
 
-        if not merchant_id or merchant_id in done:
+        pair = (merchant_id, tid)
+        if pair in done:
             continue
         if trg.get("suppression_key") in already_sent:
             continue
-        if tick_number - ticks.get(merchant_id, -99) < 3:
-            continue
-        if trg.get("urgency", 2) <= 1:
+        if tick_number - ticks.get(merchant_id, -99) < 1:
             continue
 
         chosen.append(tid)
-        done.add(merchant_id)
+        done.add(pair)
 
         if len(chosen) >= MAX_PER_TICK:
             break
